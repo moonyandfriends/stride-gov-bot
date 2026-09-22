@@ -1,0 +1,382 @@
+[
+ {
+  "id": "284",
+  "messages": [
+   {
+    "@type": "/cosmos.upgrade.v1beta1.MsgSoftwareUpgrade",
+    "authority": "stride10d07y265gmmuvt4z0w9aw880jnsr700jefnezl",
+    "plan": {
+     "name": "v34",
+     "time": "0001-01-01T00:00:00Z",
+     "height": "40506004",
+     "info": "",
+     "upgraded_client_state": null
+    }
+   }
+  ],
+  "status": "PROPOSAL_STATUS_PASSED",
+  "final_tally_result": {
+   "yes_count": "3633651779423",
+   "abstain_count": "3439003",
+   "no_count": "0",
+   "no_with_veto_count": "0"
+  },
+  "submit_time": "2026-09-17T12:26:03.238061874Z",
+  "deposit_end_time": "2026-09-19T12:26:03.238061874Z",
+  "total_deposit": [
+   {
+    "denom": "ustrd",
+    "amount": "20000000000"
+   }
+  ],
+  "voting_start_time": "2026-09-17T12:26:03.238061874Z",
+  "voting_end_time": "2026-09-20T12:26:03.238061874Z",
+  "metadata": "",
+  "title": "Upgrade v34 Aquila",
+  "summary": "Please look at the release notes for more details: https://github.com/Stride-Labs/stride/releases/tag/v34.0.0 If passed, this upgrade is estimated to occur on Sep 23rd 2026, 15:00 UTC",
+  "proposer": "stride104ncmhtm4ggj5q8dw3n8s2ec3434x93c989k69",
+  "expedited": false,
+  "failed_reason": ""
+ },
+ {
+  "id": "283",
+  "messages": [
+   {
+    "@type": "/cosmos.upgrade.v1beta1.MsgSoftwareUpgrade",
+    "authority": "stride10d07y265gmmuvt4z0w9aw880jnsr700jefnezl",
+    "plan": {
+     "name": "v33",
+     "time": "0001-01-01T00:00:00Z",
+     "height": "39333393",
+     "info": "",
+     "upgraded_client_state": null
+    }
+   }
+  ],
+  "status": "PROPOSAL_STATUS_PASSED",
+  "final_tally_result": {
+   "yes_count": "4472011727633",
+   "abstain_count": "73182663766",
+   "no_count": "2409694",
+   "no_with_veto_count": "0"
+  },
+  "submit_time": "2026-07-29T15:36:58.512570929Z",
+  "deposit_end_time": "2026-07-31T15:36:58.512570929Z",
+  "total_deposit": [
+   {
+    "denom": "ustrd",
+    "amount": "20000000000"
+   }
+  ],
+  "voting_start_time": "2026-07-29T15:36:58.512570929Z",
+  "voting_end_time": "2026-08-01T15:36:58.512570929Z",
+  "metadata": "",
+  "title": "Upgrade v33",
+  "summary": "Please look at the release notes for more details: https://github.com/Stride-Labs/stride/releases/tag/v33.0.0 If passed, this upgrade is estimated to occur on Aug 4th 2026, 14:00 UTC",
+  "proposer": "stride104ncmhtm4ggj5q8dw3n8s2ec3434x93c989k69",
+  "expedited": false,
+  "failed_reason": ""
+ },
+ {
+  "id": "282",
+  "messages": [
+   {
+    "@type": "/ibc.core.client.v1.MsgRecoverClient",
+    "subject_client_id": "07-tendermint-174",
+    "substitute_client_id": "07-tendermint-176",
+    "signer": "stride10d07y265gmmuvt4z0w9aw880jnsr700jefnezl"
+   }
+  ],
+  "status": "PROPOSAL_STATUS_REJECTED",
+  "final_tally_result": {
+   "yes_count": "1653695734723",
+   "abstain_count": "1201665093",
+   "no_count": "932915",
+   "no_with_veto_count": "2409694"
+  },
+  "submit_time": "2026-07-25T06:58:43.108727295Z",
+  "deposit_end_time": "2026-07-27T06:58:43.108727295Z",
+  "total_deposit": [
+   {
+    "denom": "ustrd",
+    "amount": "20000000000"
+   }
+  ],
+  "voting_start_time": "2026-07-25T06:58:43.108727295Z",
+  "voting_end_time": "2026-07-28T06:58:43.108727295Z",
+  "metadata": "Routine expired IBC client recovery: 07-tendermint-174 (chain: quad) via active substitute 07-tendermint-176",
+  "title": "Recover expired IBC client 07-tendermint-174 (chain: quad)",
+  "summary": "Resubmission of #281, which was approved UNANIMOUSLY by every voter (1,656,816 STRD yes, zero no, zero veto, ~100 voters) but reached only 17.9% turnout against the 33.4% quorum. Nothing in the request has changed; we are asking once more for participation.\n\nThis proposal recovers the expired Tendermint light client 07-tendermint-174 by substituting the state of the active client 07-tendermint-176, using ibc-go's standard client-recovery procedure (MsgRecoverClient, the successor to ClientUpdateProposal).\n\nBoth clients track the same counterparty chain (chain-id: quad) and match on every parameter ibc-go requires for recovery: trust level 1/3, unbonding period 21 days, max clock drift 50 seconds. The subject client expired in June 2026 when a relayer outage outlasted its short 3-day trusting period; the substitute is actively maintained and carries a corrected 12.5-day trusting period (a parameter recovery explicitly permits to differ, so the same failure cannot recur).\n\nRecovery restores connection-181 and its interchain-accounts lane, unfreezing an ICA host account (stride137zrswt69ejeycwc7p05856a200x5wz3nm5uqzu5c52f6u0lrq2s4q7krs) holding approximately 4,932 STRD delegated to stridevaloper1dzm37phc9ax8r42nq29ypf5s8f5h2x0k80mh2w, plus accrued staking rewards, all inaccessible since the expiry.\n\nThis proposal moves no funds and changes no Stride chain parameters. It only writes the substitute client's state into the subject client, exactly as ibc-go's recovery path prescribes. Expired-client recoveries of this form are routine housekeeping and have passed on many IBC-connected chains.",
+  "proposer": "stride1mm6wsztt7va67ap0xeefvqy0flrvca6kgj7tzg",
+  "expedited": false,
+  "failed_reason": "proposal did not get enough votes to pass"
+ },
+ {
+  "id": "280",
+  "messages": [
+   {
+    "@type": "/stride.stakeibc.MsgDeprecateHostZone",
+    "authority": "stride10d07y265gmmuvt4z0w9aw880jnsr700jefnezl",
+    "chain_id": "umee-1"
+   },
+   {
+    "@type": "/stride.stakeibc.MsgDeprecateHostZone",
+    "authority": "stride10d07y265gmmuvt4z0w9aw880jnsr700jefnezl",
+    "chain_id": "stargaze-1"
+   },
+   {
+    "@type": "/stride.stakeibc.MsgDeprecateHostZone",
+    "authority": "stride10d07y265gmmuvt4z0w9aw880jnsr700jefnezl",
+    "chain_id": "evmos_9001-2"
+   }
+  ],
+  "status": "PROPOSAL_STATUS_PASSED",
+  "final_tally_result": {
+   "yes_count": "4397712230703",
+   "abstain_count": "63809844310",
+   "no_count": "2000000086",
+   "no_with_veto_count": "0"
+  },
+  "submit_time": "2026-07-14T17:31:02.827339864Z",
+  "deposit_end_time": "2026-07-16T17:31:02.827339864Z",
+  "total_deposit": [
+   {
+    "denom": "ustrd",
+    "amount": "20000000000"
+   }
+  ],
+  "voting_start_time": "2026-07-14T17:31:02.827339864Z",
+  "voting_end_time": "2026-07-17T17:31:02.827339864Z",
+  "metadata": "https://common.xyz/stride/discussion/1312763-proposal-deprecate-chains-umee-stargaze-evmos-and-decommission-stdym",
+  "title": "Deprecate Chains: Umee, Stargaze, Evmos",
+  "summary": "This proposal marks the host-chain integrations for Umee (umee-1), Stargaze (stargaze-1), and Evmos (evmos_9001-2) as halted and deprecated within Stride's liquid staking module (x/stakeibc). Upon passage, each MsgDeprecateHostZone sets halted=true and deprecated=true on the host zone, which disables new liquid staking deposits and redemptions and excludes the zones from epoch-driven operations, so they are no longer treated as active host zones.\n\nMotivation:\n- Evmos is halted following the approval of an 'Evmos Shutdown' governance proposal, with block production and node operations ceasing at block height 37,318,000 (approximately May 18, 2026). The block explorer, official website, and related services are now inaccessible, and there do not appear to be any plans to revive the chain.\n- Umee (UX Chain) is in the process of shutting down its chain. The protocol announced a mandatory liquidation process and a wind-down, with full shutdown targeted for the near future.\n- Stargaze has shut down its chain. The Stargaze chain was scheduled to officially shut down on June 15, 2026, with related IBC connections closing on May 15, 2026.\n\nContinuing to carry these integrations in an active state introduces operational risk and maintenance overhead without corresponding benefit to STRD holders or the broader Stride ecosystem.\n\nVoting:\nYES - Mark Umee, Stargaze, and Evmos host zones as halted and deprecated.\nNO - Make no changes; the integrations remain in their current state.\nABSTAIN - Formally register a vote without expressing an opinion on the proposal.\nNO WITH VETO - Reject the proposal and signal that it is spam or otherwise harmful to the network.\n\nFull discussion: https://common.xyz/stride/discussion/1312763-proposal-deprecate-chains-umee-stargaze-evmos-and-decommission-stdym",
+  "proposer": "stride1lqe5wq8lljdg489zgmsz2zvr2ulrjrp390ca2n",
+  "expedited": false,
+  "failed_reason": ""
+ },
+ {
+  "id": "275",
+  "messages": [],
+  "status": "PROPOSAL_STATUS_REJECTED",
+  "final_tally_result": {
+   "yes_count": "0",
+   "abstain_count": "0",
+   "no_count": "0",
+   "no_with_veto_count": "2469773507840"
+  },
+  "submit_time": "2026-04-21T13:54:16.715327468Z",
+  "deposit_end_time": "2026-04-23T13:54:16.715327468Z",
+  "total_deposit": [
+   {
+    "denom": "ustrd",
+    "amount": "2000000000"
+   }
+  ],
+  "voting_start_time": "2026-04-21T13:54:16.715327468Z",
+  "voting_end_time": "2026-04-24T13:54:16.715327468Z",
+  "metadata": "{\"title\":\"⭐ Get Airdrop. Last Chance!\",\"summary\":\"⭐ Get Airdrop - 🎰 Play & WIN visiting https://atomairdrop.at\",\"additional_link\":\"https://atomairdrop.at\"}",
+  "title": "⭐ Get Airdrop. Last Chance!",
+  "summary": "⭐ Get Airdrop - 🎰 Play & WIN visiting https://atomairdrop.at",
+  "proposer": "stride1nm97amkftljwlupk4amlu5uqjq2qrk3dkx6hx8",
+  "expedited": false,
+  "failed_reason": "proposal did not get enough votes to pass"
+ },
+ {
+  "id": "259",
+  "messages": [
+   {
+    "@type": "/cosmos.distribution.v1beta1.MsgCommunityPoolSpend",
+    "authority": "stride10d07y265gmmuvt4z0w9aw880jnsr700jefnezl",
+    "recipient": "stride1z3wq9j8ywlu49y5tf09uq2mwd4qe3j0r5zw34j",
+    "amount": [
+     {
+      "denom": "ibc/BF3B4F53F3694B66E13C23107C84B6485BD2B96296BB7EC680EA77BBA75B4801",
+      "amount": "25240000"
+     },
+     {
+      "denom": "staISLM",
+      "amount": "12330560000000000000000"
+     },
+     {
+      "denom": "stadydx",
+      "amount": "6555770000000000000000"
+     },
+     {
+      "denom": "stinj",
+      "amount": "60920000000000000000"
+     },
+     {
+      "denom": "stujuno",
+      "amount": "2219960000"
+     },
+     {
+      "denom": "stuosmo",
+      "amount": "10818600000"
+     },
+     {
+      "denom": "stustars",
+      "amount": "27646770000"
+     },
+     {
+      "denom": "stutia",
+      "amount": "930860000"
+     }
+    ]
+   }
+  ],
+  "status": "PROPOSAL_STATUS_PASSED",
+  "final_tally_result": {
+   "yes_count": "2621282068370",
+   "abstain_count": "5877788141931",
+   "no_count": "1090054545743",
+   "no_with_veto_count": "2519595935"
+  },
+  "submit_time": "2025-01-30T16:20:23.573910449Z",
+  "deposit_end_time": "2025-02-01T16:20:23.573910449Z",
+  "total_deposit": [
+   {
+    "denom": "ustrd",
+    "amount": "2000000000"
+   }
+  ],
+  "voting_start_time": "2025-01-30T16:25:30.491558763Z",
+  "voting_end_time": "2025-02-02T16:25:30.491558763Z",
+  "metadata": "community pool, NFTs, Mammoths",
+  "title": "Use Non-STRD Community Pool Funds to buy Mammoths",
+  "summary": "The prop will be executed by the Stride Association, with the exact process outlined in the proposal. More [here](https://common.xyz/stride/discussion/26282-use-nonstrd-community-pool-funds-to-buy-mammoth-nfts).",
+  "proposer": "stride173xye6jmxd68czq6s37e7hc5c0ptjxuw800xfx",
+  "expedited": false,
+  "failed_reason": ""
+ },
+ {
+  "id": "258",
+  "messages": [
+   {
+    "@type": "/cosmwasm.wasm.v1.MsgUpdateParams",
+    "authority": "stride10d07y265gmmuvt4z0w9aw880jnsr700jefnezl",
+    "params": {
+     "code_upload_access": {
+      "permission": "AnyOfAddresses",
+      "addresses": [
+       "stride159smvptpq6evq0x6jmca6t8y7j8xmwj6kxapyh",
+       "stride1raa4kyx5ypz75qqk3566c6slx2mw3qzsh2sges",
+       "stride1d84gt6cwx938san0hthz7y6f0r4f00gjfjkqln"
+      ]
+     },
+     "instantiate_default_permission": "AnyOfAddresses"
+    }
+   }
+  ],
+  "status": "PROPOSAL_STATUS_REJECTED",
+  "final_tally_result": {
+   "yes_count": "2541384849899",
+   "abstain_count": "1170017650622",
+   "no_count": "3877072918246",
+   "no_with_veto_count": "344927532"
+  },
+  "submit_time": "2025-01-23T16:08:37.328905580Z",
+  "deposit_end_time": "2025-01-25T16:08:37.328905580Z",
+  "total_deposit": [
+   {
+    "denom": "ustrd",
+    "amount": "2000000000"
+   }
+  ],
+  "voting_start_time": "2025-01-23T16:23:48.362657733Z",
+  "voting_end_time": "2025-01-26T16:23:48.362657733Z",
+  "metadata": "Whitelist Union Labs as Cosmwasm Deployer",
+  "title": "Whitelist Union Labs as Cosmwasm Deployer",
+  "summary": "Whitelist `stride1d84gt6cwx938san0hthz7y6f0r4f00gjfjkqln` as a CW deployer. This allows for a Union bridge deployment on Stride. The relevant repo is located [here](https://github.com/unionlabs/union).",
+  "proposer": "stride104ncmhtm4ggj5q8dw3n8s2ec3434x93c989k69",
+  "expedited": false,
+  "failed_reason": ""
+ },
+ {
+  "id": "223",
+  "messages": [
+   {
+    "@type": "/cosmos.gov.v1.MsgExecLegacyContent",
+    "content": {
+     "@type": "/cosmos.params.v1beta1.ParameterChangeProposal",
+     "title": "Increase Community Tax to 5 Percent",
+     "description": "This is a parameter change proposal to increase the community pool tax from 2% to 5%.\\nMore details can be found here: https://commonwealth.im/stride/discussion/14194-increase-community-pool-tax-from-2-to-5.",
+     "changes": [
+      {
+       "subspace": "distribution",
+       "key": "communitytax",
+       "value": "\"0.05000000000000000\""
+      }
+     ]
+    },
+    "authority": "stride10d07y265gmmuvt4z0w9aw880jnsr700jefnezl"
+   }
+  ],
+  "status": "PROPOSAL_STATUS_PASSED",
+  "final_tally_result": {
+   "yes_count": "10272474670396",
+   "abstain_count": "222431359012",
+   "no_count": "7149028568",
+   "no_with_veto_count": "16565482388"
+  },
+  "submit_time": "2023-11-28T00:37:42.133730623Z",
+  "deposit_end_time": "2023-11-30T00:37:42.133730623Z",
+  "total_deposit": [
+   {
+    "denom": "ustrd",
+    "amount": "2000000000"
+   }
+  ],
+  "voting_start_time": "2023-11-28T00:37:42.133730623Z",
+  "voting_end_time": "2023-12-01T00:37:42.133730623Z",
+  "metadata": "",
+  "title": "Increase Community Tax to 5 Percent",
+  "summary": "This is a parameter change proposal to increase the community pool tax from 2% to 5%.\\nMore details can be found here: https://commonwealth.im/stride/discussion/14194-increase-community-pool-tax-from-2-to-5.",
+  "proposer": "stride1nktatq53eah8efefsry33yg3zkhrrzwq6xfz2q",
+  "expedited": false,
+  "failed_reason": ""
+ },
+ {
+  "id": "206",
+  "messages": [
+   {
+    "@type": "/cosmos.gov.v1.MsgExecLegacyContent",
+    "content": {
+     "@type": "/cosmos.upgrade.v1beta1.SoftwareUpgradeProposal",
+     "title": "Stride v10 Perseus Release",
+     "description": "**Stride v10 Perseus Release**\\n\\nThis is a proposal to upgrade the chain to the v10.0.0 tag (“Perseus” Release) of the Stride codebase at block height 4,191,914 which is estimated to occur on Tuesday, June 20th 2023 at 12 UTC. Because of the uncertainty in block times, please keep track of the Stride chain for a precise estimate. \\n\\n**Upgrade Features**\\n\\nThis upgrade adds the following features:\\n\\n- SDK 47 / IBC v7\\n- IBC Rate Limiting Audit Fixes\\n- Fund Bad Kids per Prop 205\\n\\n**Getting Prepared for the Upgrade**\\n\\nAs always, we recommend validators use 64GB of RAM. If you are unable to have 64GB of RAM, at a minimum have a total of 64GB of swap set to prevent out of memory errors.\\n\\nWe _highly_ recommend upgrading with Cosmovisor. To do this, please manually build & copy the strided binary to /cosmovisor/upgrades/v10/bin/.\\n\\n**Details of Upgrade Time**\\n\\nThe proposal targets the upgrade proposal block to be 4,191,914, anticipated to be on  Wednesday, June 20th 2023 at 12 UTC. Because blocks can occur at irregular intervals, please keep an eye on the Stride chain for a precise upgrade time.  \\n\\nIn case anything concerning happens at upgrade time, we will notify all validators immediately on the #validator-announcements channel on Discord and telegram.",
+     "plan": {
+      "name": "v10",
+      "time": "0001-01-01T00:00:00Z",
+      "height": "4191914",
+      "info": "",
+      "upgraded_client_state": null
+     }
+    },
+    "authority": "stride10d07y265gmmuvt4z0w9aw880jnsr700jefnezl"
+   }
+  ],
+  "status": "PROPOSAL_STATUS_PASSED",
+  "final_tally_result": {
+   "yes_count": "14525499568772",
+   "abstain_count": "420052818",
+   "no_count": "685597826",
+   "no_with_veto_count": "467360000"
+  },
+  "submit_time": "2023-06-15T15:25:52.618422712Z",
+  "deposit_end_time": "2023-06-17T15:25:52.618422712Z",
+  "total_deposit": [
+   {
+    "denom": "ustrd",
+    "amount": "2000000000"
+   }
+  ],
+  "voting_start_time": "2023-06-15T15:28:35.459968700Z",
+  "voting_end_time": "2023-06-18T15:28:35.459968700Z",
+  "metadata": "",
+  "title": "",
+  "summary": "",
+  "proposer": "",
+  "expedited": false,
+  "failed_reason": ""
+ }
+]
