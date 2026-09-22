@@ -9,8 +9,17 @@ import gov_bot as g
 FIXTURES = {p["id"]: p for p in json.loads((Path(__file__).parent / "fixtures.json").read_text())}
 
 
+def responses_reply(output, rid="resp_1"):
+    return {"id": rid, "status": "completed", "output": output}
+
+
+def text_output(obj):
+    return [{"type": "reasoning", "summary": []},
+            {"type": "message", "content": [{"type": "output_text", "text": json.dumps(obj)}]}]
+
+
 def openai_response(obj):
-    return json.dumps({"choices": [{"message": {"content": json.dumps(obj)}}]})
+    return json.dumps(responses_reply(text_output(obj)))
 
 
 GOOD_REVIEW = {"summary": "Upgrades Stride to v34.", "effects": ["Chain halts at 40506004 for v34"],
@@ -134,14 +143,16 @@ class AnalyzeTests(unittest.TestCase):
         with mock.patch.multiple(g, OPENAI_API_KEY="sk-test", http=fake_http):
             a = g.analyze(FIXTURES["284"])
         url, body, headers = calls[0]
-        self.assertTrue(url.endswith("/chat/completions"))
+        self.assertTrue(url.endswith("/responses"))
         self.assertEqual(headers["Authorization"], "Bearer sk-test")
-        self.assertEqual(body["response_format"], {"type": "json_object"})
-        self.assertIn("UNTRUSTED", body["messages"][0]["content"])
-        self.assertIn("40506004", body["messages"][1]["content"])
-        self.assertIn("v33.0.0", body["messages"][1]["content"])
-        self.assertIn("Tornado Cash", body["messages"][0]["content"])  # knowledge/ is in the prompt
-        self.assertEqual({t["function"]["name"] for t in body["tools"]},
+        self.assertEqual(body["text"], {"format": {"type": "json_object"}})
+        self.assertEqual(body["reasoning"], {"effort": g.OPENAI_REASONING_EFFORT})
+        self.assertIn("UNTRUSTED", body["instructions"])
+        self.assertIn("Tornado Cash", body["instructions"])  # knowledge/ is in the prompt
+        self.assertIn("40506004", body["input"][0]["content"])
+        self.assertIn("v33.0.0", body["input"][0]["content"])
+        self.assertTrue(all(t["type"] == "function" and "parameters" in t for t in body["tools"]))
+        self.assertEqual({t["name"] for t in body["tools"]},
                          {"search_code", "read_file", "list_files", "diff_refs", "query_chain", "github_release"})
         self.assertEqual(a["risk_level"], "high")
         self.assertEqual(a["concerns"], ["one string"])
@@ -151,7 +162,7 @@ class AnalyzeTests(unittest.TestCase):
         captured = {}
 
         def fake_http(method, url, body=None, **kw):
-            captured["user"] = body["messages"][1]["content"]
+            captured["user"] = body["input"][0]["content"]
             return openai_response(GOOD_REVIEW)
 
         with mock.patch.multiple(g, OPENAI_API_KEY="k", http=fake_http):
@@ -167,7 +178,8 @@ class AnalyzeTests(unittest.TestCase):
 
 
 def tool_call(i, name, args):
-    return {"id": f"call_{i}", "type": "function", "function": {"name": name, "arguments": json.dumps(args)}}
+    return {"type": "function_call", "id": f"fc_{i}", "call_id": f"call_{i}", "name": name,
+            "arguments": json.dumps(args)}
 
 
 class ToolLoopTests(unittest.TestCase):
@@ -190,40 +202,51 @@ class ToolLoopTests(unittest.TestCase):
 
         def fake_http(method, url, body=None, **kw):
             self.requests.append(json.loads(json.dumps(body)))
-            return json.dumps({"choices": [{"message": next(replies)}]})
+            return json.dumps(responses_reply(next(replies), rid=f"resp_{len(self.requests)}"))
 
         with mock.patch.object(g, "http", fake_http):
             return g.analyze(FIXTURES["284"])
 
     def test_tool_results_are_fed_back_and_traced(self):
         a = self.run_with([
-            {"role": "assistant", "content": None, "tool_calls": [
-                tool_call(1, "github_release", {"tag": "v34.0.0"}),
-                tool_call(2, "read_file", {"ref": "v34.0.0", "path": "app/upgrades/v34/upgrades.go"})]},
-            {"role": "assistant", "content": json.dumps({**GOOD_REVIEW, "verified": ["handler checked"]})},
+            [{"type": "reasoning", "summary": []},
+             tool_call(1, "github_release", {"tag": "v34.0.0"}),
+             tool_call(2, "read_file", {"ref": "v34.0.0", "path": "app/upgrades/v34/upgrades.go"})],
+            text_output({**GOOD_REVIEW, "verified": ["handler checked"]}),
         ])
         self.assertEqual(a["risk_level"], "low")
         self.assertEqual(a["verified"], ["handler checked"])
         self.assertEqual(a["checked"], ["github_release v34.0.0", "read_file app/upgrades/v34/upgrades.go @v34.0.0"])
-        second = self.requests[1]["messages"]
-        self.assertEqual(second[2]["tool_calls"][0]["id"], "call_1")
-        self.assertEqual([m["content"] for m in second[3:]], ["result of github_release", "result of read_file"])
+        second = self.requests[1]
+        self.assertEqual(second["previous_response_id"], "resp_1")
+        self.assertIn("UNTRUSTED", second["instructions"])  # instructions are resent every turn
+        self.assertEqual(second["input"], [
+            {"type": "function_call_output", "call_id": "call_1", "output": "result of github_release"},
+            {"type": "function_call_output", "call_id": "call_2", "output": "result of read_file"}])
         self.assertIn("Looked at: github_release v34.0.0", g.analysis_text(a))
 
     def test_budget_forces_a_final_answer(self):
         with mock.patch.object(g, "REVIEW_MAX_TOOL_CALLS", 2):
             a = self.run_with([
-                {"role": "assistant", "content": None, "tool_calls": [tool_call(1, "query_chain", {"path": "/cosmos/x"})]},
-                {"role": "assistant", "content": None, "tool_calls": [tool_call(2, "query_chain", {"path": "/cosmos/y"})]},
-                {"role": "assistant", "content": json.dumps(GOOD_REVIEW)},
+                [tool_call(1, "query_chain", {"path": "/cosmos/x"})],
+                [tool_call(2, "query_chain", {"path": "/cosmos/y"})],
+                text_output(GOOD_REVIEW),
             ])
         self.assertEqual(len(a["checked"]), 2)
+        self.assertEqual(len(self.requests), 3)
         self.assertEqual(self.requests[-1]["tool_choice"], "none")
-        self.assertIn("budget used up", self.requests[-1]["messages"][-1]["content"])
+        self.assertEqual(self.requests[-1]["input"][0]["call_id"], "call_2")  # last call still answered
+        self.assertIn("budget used up", self.requests[-1]["input"][-1]["content"])
+
+    def test_incomplete_response_is_an_error(self):
+        with mock.patch.object(g, "http", lambda *x, **k: json.dumps(
+                {"id": "r", "status": "incomplete", "incomplete_details": {"reason": "max_output_tokens"}})):
+            a = g.analyze(FIXTURES["284"])
+        self.assertIn("max_output_tokens", a["error"])
 
     def test_tools_off(self):
         with mock.patch.object(g, "AI_TOOLS", False):
-            a = self.run_with([{"role": "assistant", "content": json.dumps(GOOD_REVIEW)}])
+            a = self.run_with([text_output(GOOD_REVIEW)])
         self.assertNotIn("tools", self.requests[0])
         self.assertEqual(a["checked"], [])
 
