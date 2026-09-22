@@ -113,6 +113,13 @@ class PayloadTests(unittest.TestCase):
 
 
 class AnalyzeTests(unittest.TestCase):
+    def setUp(self):
+        self.ctx = mock.patch.object(g, "review_context", lambda: "Stride mainnet currently runs v33.0.0.")
+        self.ctx.start()
+
+    def tearDown(self):
+        self.ctx.stop()
+
     def test_disabled_without_key(self):
         with mock.patch.object(g, "OPENAI_API_KEY", ""):
             self.assertIsNone(g.analyze(FIXTURES["284"]))
@@ -132,6 +139,10 @@ class AnalyzeTests(unittest.TestCase):
         self.assertEqual(body["response_format"], {"type": "json_object"})
         self.assertIn("UNTRUSTED", body["messages"][0]["content"])
         self.assertIn("40506004", body["messages"][1]["content"])
+        self.assertIn("v33.0.0", body["messages"][1]["content"])
+        self.assertIn("Tornado Cash", body["messages"][0]["content"])  # knowledge/ is in the prompt
+        self.assertEqual({t["function"]["name"] for t in body["tools"]},
+                         {"search_code", "read_file", "list_files", "diff_refs", "query_chain", "github_release"})
         self.assertEqual(a["risk_level"], "high")
         self.assertEqual(a["concerns"], ["one string"])
 
@@ -153,6 +164,138 @@ class AnalyzeTests(unittest.TestCase):
             self.assertEqual(g.analyze(FIXTURES["284"])["risk_level"], "unknown")
         with mock.patch.multiple(g, OPENAI_API_KEY="k", http=lambda *a, **k: "not json"):
             self.assertIn("error", g.analyze(FIXTURES["284"]))
+
+
+def tool_call(i, name, args):
+    return {"id": f"call_{i}", "type": "function", "function": {"name": name, "arguments": json.dumps(args)}}
+
+
+class ToolLoopTests(unittest.TestCase):
+    def setUp(self):
+        self.requests = []
+        self.patches = [
+            mock.patch.object(g, "review_context", lambda: "ctx"),
+            mock.patch.object(g, "OPENAI_API_KEY", "k"),
+            mock.patch.object(g, "make_toolbox", lambda: mock.Mock(call=lambda n, a: f"result of {n}")),
+        ]
+        for p in self.patches:
+            p.start()
+
+    def tearDown(self):
+        for p in self.patches:
+            p.stop()
+
+    def run_with(self, replies):
+        replies = iter(replies)
+
+        def fake_http(method, url, body=None, **kw):
+            self.requests.append(json.loads(json.dumps(body)))
+            return json.dumps({"choices": [{"message": next(replies)}]})
+
+        with mock.patch.object(g, "http", fake_http):
+            return g.analyze(FIXTURES["284"])
+
+    def test_tool_results_are_fed_back_and_traced(self):
+        a = self.run_with([
+            {"role": "assistant", "content": None, "tool_calls": [
+                tool_call(1, "github_release", {"tag": "v34.0.0"}),
+                tool_call(2, "read_file", {"ref": "v34.0.0", "path": "app/upgrades/v34/upgrades.go"})]},
+            {"role": "assistant", "content": json.dumps({**GOOD_REVIEW, "verified": ["handler checked"]})},
+        ])
+        self.assertEqual(a["risk_level"], "low")
+        self.assertEqual(a["verified"], ["handler checked"])
+        self.assertEqual(a["checked"], ["github_release v34.0.0", "read_file app/upgrades/v34/upgrades.go @v34.0.0"])
+        second = self.requests[1]["messages"]
+        self.assertEqual(second[2]["tool_calls"][0]["id"], "call_1")
+        self.assertEqual([m["content"] for m in second[3:]], ["result of github_release", "result of read_file"])
+        self.assertIn("Looked at: github_release v34.0.0", g.analysis_text(a))
+
+    def test_budget_forces_a_final_answer(self):
+        with mock.patch.object(g, "REVIEW_MAX_TOOL_CALLS", 2):
+            a = self.run_with([
+                {"role": "assistant", "content": None, "tool_calls": [tool_call(1, "query_chain", {"path": "/cosmos/x"})]},
+                {"role": "assistant", "content": None, "tool_calls": [tool_call(2, "query_chain", {"path": "/cosmos/y"})]},
+                {"role": "assistant", "content": json.dumps(GOOD_REVIEW)},
+            ])
+        self.assertEqual(len(a["checked"]), 2)
+        self.assertEqual(self.requests[-1]["tool_choice"], "none")
+        self.assertIn("budget used up", self.requests[-1]["messages"][-1]["content"])
+
+    def test_tools_off(self):
+        with mock.patch.object(g, "AI_TOOLS", False):
+            a = self.run_with([{"role": "assistant", "content": json.dumps(GOOD_REVIEW)}])
+        self.assertNotIn("tools", self.requests[0])
+        self.assertEqual(a["checked"], [])
+
+
+class ToolboxTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = tempfile.TemporaryDirectory()
+        # Build a fake GitHub tarball for two refs.
+        import io, tarfile
+        cls.tarballs = {}
+        for ref, handler in (("v1.0.0", "package v1\nfunc Handler() {}\n"),
+                             ("v2.0.0", "package v2\nfunc Handler() { mint() }\n")):
+            buf = io.BytesIO()
+            with tarfile.open(fileobj=buf, mode="w:gz") as tar:
+                for name, data in ((f"stride-{ref}/app/upgrades/handler.go", handler),
+                                   (f"stride-{ref}/utils/admins.go", "var Admins = 1\n"),
+                                   (f"stride-{ref}/x/foo/types/tx.pb.go", "func Handler() {}\n"),
+                                   (f"stride-{ref}/logo.png", "binary")):
+                    info = tarfile.TarInfo(name)
+                    info.size = len(data.encode())
+                    tar.addfile(info, io.BytesIO(data.encode()))
+            cls.tarballs[ref] = buf.getvalue()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.tmp.cleanup()
+
+    def setUp(self):
+        import io
+
+        def fake_urlopen(req, timeout=None):
+            ref = req.full_url.rsplit("/", 1)[-1]
+            return io.BytesIO(self.tarballs[ref])
+
+        self.urlopen = mock.patch("review_tools.urllib.request.urlopen", fake_urlopen)
+        self.urlopen.start()
+        self.chain = []
+        self.tb = g.Toolbox(http=None, lcd_get=lambda path: self.chain.append(path) or {"ok": path},
+                            src_dir=self.tmp.name, log=lambda *a: None)
+
+    def tearDown(self):
+        self.urlopen.stop()
+
+    def test_source_tools(self):
+        self.assertIn("1  package v1", self.tb.call("read_file", {"ref": "v1.0.0", "path": "app/upgrades/handler.go"}))
+        hits = self.tb.call("search_code", {"ref": "v1.0.0", "pattern": "func Handler"})
+        self.assertIn("app/upgrades/handler.go:2:", hits)
+        self.assertNotIn("tx.pb.go", hits)  # generated code skipped by default
+        self.assertIn("upgrades/", self.tb.call("list_files", {"ref": "v1.0.0", "path": "app"}))
+        self.assertIn("file not found", self.tb.call("read_file", {"ref": "v1.0.0", "path": "logo.png"}))
+
+    def test_diff(self):
+        listing = self.tb.call("diff_refs", {"base_ref": "v1.0.0", "head_ref": "v2.0.0"})
+        self.assertIn("M app/upgrades/handler.go (+2 -2)", listing)
+        self.assertNotIn("admins.go", listing)
+        patch = self.tb.call("diff_refs", {"base_ref": "v1.0.0", "head_ref": "v2.0.0", "path": "app/upgrades/handler.go"})
+        self.assertIn("+func Handler() { mint() }", patch)
+
+    def test_refuses_escapes_and_bad_input(self):
+        self.assertIn("escapes", self.tb.call("read_file", {"ref": "v1.0.0", "path": "../../etc/passwd"}))
+        self.assertIn("invalid git ref", self.tb.call("read_file", {"ref": "../x", "path": "a"}))
+        self.assertIn("invalid regex", self.tb.call("search_code", {"ref": "v1.0.0", "pattern": "("}))
+        self.assertIn("unknown tool", self.tb.call("rm_rf", {}))
+        self.assertIn("bad arguments", self.tb.call("read_file", {"nope": 1}))
+
+    def test_query_chain_allowlist(self):
+        self.assertIn("/ibc/core/client/v1/client_states/07-tendermint-1",
+                      self.tb.call("query_chain", {"path": "/ibc/core/client/v1/client_states/07-tendermint-1"}))
+        for bad in ("http://evil.xyz/", "/cosmos/../admin", "//evil.xyz/cosmos/", "/unsafe/thing", "/cosmos/a b"):
+            self.assertIn("refused", self.tb.call("query_chain", {"path": bad}), bad)
+        self.assertEqual(len(self.chain), 1)
 
 
 class PollTests(unittest.TestCase):
